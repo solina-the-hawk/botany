@@ -1,5 +1,8 @@
 -- =========================================================================
 -- BOTANY EXTENSION: Refining Module
+-- A dynamic extension for the Botany collection system.
+-- Author: Solina (https://github.com/solina-the-hawk/Botany/)
+-- Version: 1.0.0
 -- =========================================================================
 
 Botany = Botany or {}
@@ -24,16 +27,13 @@ function Botany.startRefine(target, amount)
     
     Botany.echo("Queueing <botanyMain>" .. amount .. "<botanyText>x refinement for " .. target .. " from " .. refData.source .. ".")
     
-    -- Pull raw materials from the Rift
     send("queue add eqbal outr " .. amount .. " " .. refData.source)
     
-    -- Queue the exact number of refinements needed
     for i = 1, amount do
         local cmd = "refine for " .. target
         if refData.vial then cmd = cmd .. " into vial" end
         send("queue add eqbal " .. cmd)
     end
     
-    -- Sweep everything back to safety
     send("queue add eqbal inr all")
 end

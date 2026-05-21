@@ -1,5 +1,8 @@
 -- =========================================================================
 -- BOTANY EXTENSION: Butchery Module
+-- A dynamic extension for the Botany collection system.
+-- Author: Solina (https://github.com/solina-the-hawk/Botany/)
+-- Version: 1.0.0
 -- =========================================================================
 
 Botany = Botany or {}
@@ -60,6 +63,5 @@ function Botany.onItemsListButchery()
   end
 end
 
--- Safely register the GMCP handler just for this module
 if Botany.butcheryHandler then killAnonymousEventHandler(Botany.butcheryHandler) end
 Botany.butcheryHandler = registerAnonymousEventHandler("gmcp.Char.Items.List", "Botany.onItemsListButchery")

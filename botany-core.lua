@@ -1,12 +1,14 @@
 -- =========================================================================
 -- BOTANY: Automated Harvesting & Gathering System for Achaea
+-- A comprehensive, modular system for botanical collection and processing.
+-- Author: Solina (https://github.com/solina-the-hawk/Botany/)
+-- Version: 1.0.0
 -- =========================================================================
 
 Botany = Botany or {}
 
 -- =========================================================================
 -- Configuration
--- Permanent settings and thematic color palette.
 -- =========================================================================
 Botany.config = Botany.config or {
     colors = {
@@ -23,7 +25,6 @@ end
 
 -- =========================================================================
 -- Runtime States
--- Internal variables used for math and tracking.
 -- =========================================================================
 Botany.HarvestOn = Botany.HarvestOn or false
 Botany.Balance = Botany.Balance or 1
@@ -37,11 +38,9 @@ Botany.GatherOn = Botany.GatherOn or false
 Botany.GathTar = Botany.GathTar or "None"
 Botany.Gathering = Botany.Gathering or false
 
--- Extension States
 Botany.ButcheryOn = Botany.ButcheryOn or false
 Botany.RefiningOn = Botany.RefiningOn or false
 
--- Plant Tracking Tables
 Botany.Ginseng = Botany.Ginseng or {Enabled = true, Harvest = false}
 Botany.Ash = Botany.Ash or {Enabled = true, Harvest = false}
 Botany.Echinacea = Botany.Echinacea or {Enabled = true, Harvest = false}
@@ -113,7 +112,7 @@ function Botany.help()
   cecho("\n  <botanyMain>bot reset<botanyText>            - Emergency reset (clears stuck active flags)")
   cecho("\n\n<botanyMain>Module Actions:<reset>")
   cecho("\n  <botanyMain>bot butcher <type><botanyText>   - Butcher inventory corpses (meat, skins, reagents)")
-  cecho("\n  <botanyMain>bot refine <item> <#><botanyText>- Refine an amount of gathered commodities (e.g., bot refine oil 5)")
+  cecho("\n  <botanyMain>bot refine <item> <#><botanyText>- Refine an amount of gathered commodities")
   cecho("\n<botanyAccent>=======================================================================<reset>\n")
 end
 
@@ -159,37 +158,31 @@ end
 -- =========================================================================
 function Botany.toggleModule(modName)
   if modName == "butchery" then
-    -- Verify the extension script is actually installed in Mudlet
     if not Botany.startButcher then
       Botany.echo("<botanyAlert>Error: <botanyText>Butchery module script is missing from your Mudlet package!")
       Botany.ButcheryOn = false
       return
     end
-    
     Botany.ButcheryOn = not Botany.ButcheryOn
     local status = Botany.ButcheryOn and "<botanyMain>Enabled" or "<botanyAlert>Disabled"
     Botany.echo("Butchering Module: " .. status)
     
   elseif modName == "refining" then
-    -- Verify the extension script is actually installed in Mudlet
     if not Botany.startRefine then
       Botany.echo("<botanyAlert>Error: <botanyText>Refining module script is missing from your Mudlet package!")
       Botany.RefiningOn = false
       return
     end
-    
     Botany.RefiningOn = not Botany.RefiningOn
     local status = Botany.RefiningOn and "<botanyMain>Enabled" or "<botanyAlert>Disabled"
     Botany.echo("Refining Module: " .. status)
   end
-  
   Botany.save()
 end
 
 -- =========================================================================
 -- GATHERING LOGIC
 -- =========================================================================
-
 function Botany.gatherScan()
   if Botany.GatherOn == true then
     if Botany.Balance == 1 then
@@ -282,7 +275,6 @@ end
 -- =========================================================================
 -- HARVESTING LOGIC
 -- =========================================================================
-
 function Botany.harvested()
   local plant = Botany.HarvTar
   if Botany[plant] then Botany[plant].Harvest = false end
@@ -413,8 +405,6 @@ end
 -- =========================================================================
 -- SITUATIONAL ALERTS
 -- =========================================================================
-
--- Expand this list as you discover new fish in Achaea!
 Botany.fishNames = {
   "trout", "salmon", "bass", "minnow", "koi", "pike", "carp"
 }
@@ -424,76 +414,53 @@ Botany.reagentMobs = {
 }
 
 function Botany.checkRoomItems(event)
-  -- Exit early if neither module is on
   if not Botany.HarvestOn and not Botany.GatherOn then return end
   
   local items = {}
-  
-  -- Catch items when we walk into a room
   if event == "gmcp.Char.Items.List" and gmcp.Char.Items.List.location == "room" then
     items = gmcp.Char.Items.List.items
-  -- Catch items that drop or walk into the room while we're standing there
   elseif event == "gmcp.Char.Items.Add" and gmcp.Char.Items.Add.location == "room" then
     table.insert(items, gmcp.Char.Items.Add.item)
   else
     return
   end
 
-  local foundEagle = false
-  local foundSnake = false
-  local foundReagentMob = false
+  local foundEagle, foundSnake, foundReagentMob = false, false, false
   local reagentMobName = ""
 
   for _, item in ipairs(items) do
     local name = item.name:lower()
     local isDead = name:find("dead") or name:find("corpse")
     
-    -- HARVESTING CHECKS
     if Botany.HarvestOn then
       if name:find("eagle") and not isDead then foundEagle = true end
       if (name:find("snake") or name:find("sidewinder")) and isDead then foundSnake = true end
     end
     
-    -- GATHERING/BUTCHERY CHECKS (Must be alive)
     if Botany.GatherOn and not isDead then
-      -- Check primary reagent mobs
       for _, mob in ipairs(Botany.reagentMobs) do
         if name:find(mob) then
-          foundReagentMob = true
-          reagentMobName = item.name
-          break
+          foundReagentMob = true; reagentMobName = item.name; break
         end
       end
-      
-      -- Check fish array if we haven't found anything yet
       if not foundReagentMob then
         for _, fish in ipairs(Botany.fishNames) do
           if name:find(fish) then
-            foundReagentMob = true
-            reagentMobName = item.name
-            break
+            foundReagentMob = true; reagentMobName = item.name; break
           end
         end
       end
     end
   end
 
-  -- Execute Echos
-  if foundEagle then
-    Botany.echo("<botanyMain>Notice:<botanyText> An eagle is here! You may be able to <botanyMain>PLUCK EAGLE<botanyText> for feathers.")
-  end
-  if foundSnake then
-    Botany.echo("<botanyMain>Notice:<botanyText> A dead snake is here! You may be able to <botanyMain>HARVEST SKIN<botanyText>.")
-  end
-  if foundReagentMob then
-    Botany.echo("<botanyMain>Notice:<botanyText> A " .. reagentMobName .. " is here! You can hunt it for butchery reagents.")
-  end
+  if foundEagle then Botany.echo("<botanyMain>Notice:<botanyText> An eagle is here! You may be able to <botanyMain>PLUCK EAGLE<botanyText> for feathers.") end
+  if foundSnake then Botany.echo("<botanyMain>Notice:<botanyText> A dead snake is here! You may be able to <botanyMain>HARVEST SKIN<botanyText>.") end
+  if foundReagentMob then Botany.echo("<botanyMain>Notice:<botanyText> A " .. reagentMobName .. " is here! You can hunt it for butchery reagents.") end
 end
 
 -- =========================================================================
 -- CORE SYSTEM & MEMORY LOGIC
 -- =========================================================================
-
 function Botany.reset()
   for k, v in pairs(Botany) do
     if type(v) == "table" and v.Harvest ~= nil then v.Harvest = false end
@@ -514,7 +481,6 @@ function Botany.togglePlant(plant)
     Botany.echo("<botanyAlert>Error: No plant/item specified!")
     return
   end
-  
   plant = plant:sub(1,1):upper() .. plant:sub(2):lower()
   
   if Botany[plant] and type(Botany[plant]) == "table" and Botany[plant].Enabled ~= nil then
@@ -541,8 +507,8 @@ function Botany.onRoom()
 
   local roomID = tostring(gmcp.Room.Info.num)
   local areaName = gmcp.Room.Info.area
-
   local areaMem = Botany.Memory[areaName]
+  
   if areaMem then
     local hoursElapsed = (os.time() - areaMem.timestamp) / 3600
     if hoursElapsed >= Botany.GlobalExpiration then
@@ -556,12 +522,10 @@ function Botany.onRoom()
     roomHarvested = true
     local daysElapsed = math.floor((os.time() - areaMem.timestamp) / 3600)
     
-    -- Format the message
     local msg = daysElapsed == 0 
       and "You recall harvesting in this area less than a day ago." 
       or string.format("You recall harvesting in this area about %d days ago.", daysElapsed)
       
-    -- Spawn a temporary trigger to catch the Exits line
     if Botany.recallTrigger then killTrigger(Botany.recallTrigger) end
     Botany.recallTrigger = tempRegexTrigger("^(?:You see exits leading|You see a single exit leading|There are no obvious exits\\.|\\[ Exits:).*", function()
       cecho("\n<botanyMain>" .. msg .. "<reset>")
@@ -569,7 +533,6 @@ function Botany.onRoom()
       Botany.recallTrigger = nil
     end, 1)
     
-    -- Failsafe: If the exits line never arrives (blindness, gagged, etc), print it anyway
     tempTimer(0.2, function()
       if Botany.recallTrigger then
         cecho("\n<botanyMain>" .. msg .. "<reset>\n")
@@ -584,11 +547,7 @@ function Botany.onRoom()
       Botany.LastRoom = roomID
       if not roomHarvested then
         tempTimer(0.5, function()
-          if Botany.HarvestOn then 
-            Botany.harvestScan()
-          elseif Botany.GatherOn then
-            Botany.gatherScan()
-          end
+          Botany.scan()
         end)
       end
     end
@@ -614,7 +573,9 @@ function Botany.setExpiration(hours)
 end
 
 function Botany.save()
-  -- Export only variables and states, strictly protecting our functions
+  local baseDir = getMudletHomeDir() .. "/Botany"
+  if not lfs.attributes(baseDir) then lfs.mkdir(baseDir) end
+  
   local exportData = {
     HarvestOn = Botany.HarvestOn,
     GatherOn = Botany.GatherOn,
@@ -625,7 +586,6 @@ function Botany.save()
     Memory = Botany.Memory
   }
   
-  -- Compile a list of all plant/commodity tables to save their enabled status
   local allItems = {
     "Ginseng", "Ash", "Echinacea", "Ginger", "Myrrh", "Bellwort", "Bloodroot", 
     "Hawthorn", "Kuzu", "Skullcap", "Slipper", "Goldenseal", "Valerian", "Bayberry", 
@@ -634,12 +594,10 @@ function Botany.save()
   for _, item in ipairs(Botany.gatherItems) do table.insert(allItems, item) end
   
   for _, item in ipairs(allItems) do
-    if Botany[item] then
-      exportData[item] = {Enabled = Botany[item].Enabled}
-    end
+    if Botany[item] then exportData[item] = {Enabled = Botany[item].Enabled} end
   end
 
-  local filepath = getMudletHomeDir() .. "/Botany_Profile.json"
+  local filepath = baseDir .. "/Botany_Profile.json"
   local file = io.open(filepath, "w")
   if file then
     file:write(yajl.to_string(exportData))
@@ -648,10 +606,8 @@ function Botany.save()
 end
 
 function Botany.load()
-  local filepath = getMudletHomeDir() .. "/Botany_Profile.json"
+  local filepath = getMudletHomeDir() .. "/Botany/Botany_Profile.json"
   local file = io.open(filepath, "r")
-  
-  -- If the JSON doesn't exist yet, exit silently
   if not file then return end 
   
   local contents = file:read("*a")
@@ -659,7 +615,6 @@ function Botany.load()
   
   local success, data = pcall(yajl.to_value, contents)
   if success and type(data) == "table" then
-    -- Safely map the data back into the runtime variables
     if data.HarvestOn ~= nil then Botany.HarvestOn = data.HarvestOn end
     if data.GatherOn ~= nil then Botany.GatherOn = data.GatherOn end
     if data.ButcheryOn ~= nil then Botany.ButcheryOn = data.ButcheryOn end
@@ -668,7 +623,6 @@ function Botany.load()
     if data.GlobalExpiration ~= nil then Botany.GlobalExpiration = data.GlobalExpiration end
     if data.Memory ~= nil then Botany.Memory = data.Memory end
     
-    -- Map plant states back
     local allItems = {
         "Ginseng", "Ash", "Echinacea", "Ginger", "Myrrh", "Bellwort", "Bloodroot", 
         "Hawthorn", "Kuzu", "Skullcap", "Slipper", "Goldenseal", "Valerian", "Bayberry", 
@@ -704,8 +658,7 @@ function Botany.scan()
 end
 
 -- =========================================================================
--- Master Command Handler
--- Routes all user "bot" commands dynamically.
+-- MASTER COMMAND HANDLER
 -- =========================================================================
 function Botany.handleCommand(args_str)
   local args = args_str:split(" ")
@@ -724,7 +677,6 @@ function Botany.handleCommand(args_str)
   elseif cmd == "toggle" then Botany.togglePlant(args[2])
   elseif cmd == "reset" then Botany.reset()
   
-  -- Extension Execution Traps
   elseif cmd == "butcher" then
     if Botany.ButcheryOn and Botany.startButcher then Botany.startButcher(args[2])
     else Botany.echo("<botanyAlert>Error: <botanyText>Butchering module is disabled or missing. Type 'bot butchering' to enable.") end
@@ -737,9 +689,8 @@ function Botany.handleCommand(args_str)
 end
 
 -- =========================================================================
--- Initialization & Triggers
+-- INITIALIZATION & TRIGGERS
 -- =========================================================================
-
 Botany.trigger_ids = Botany.trigger_ids or {}
 Botany.alias_ids = Botany.alias_ids or {}
 Botany.event_ids = Botany.event_ids or {}
@@ -749,54 +700,37 @@ function Botany.createTriggers()
   for _, id in pairs(Botany.alias_ids) do killAlias(id) end
   Botany.trigger_ids = {}
   Botany.alias_ids = {}
-  -- Master Alias (Now accepts BOT or BOTANY)
+
   table.insert(Botany.alias_ids, tempAlias("^(?i)(?:bot|botany)(?:\\s+(.*))?$", [[
       local args_str = matches[2] or ""
       Botany.handleCommand(args_str)
   ]]))
 
-  -- Login Initialization
   table.insert(Botany.trigger_ids, tempRegexTrigger("^Password correct\\. Welcome to Achaea\\.$", [[Botany.init()]]))
-
-  -- Harvest Success
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You reach out and carefully harvest", [[Botany.harvested()]]))
-
-  -- Harvest Failures
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You have already harvested from this plant recently\\.$", [[Botany.harvestClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("^That plant has been fully harvested\\.$", [[Botany.harvestClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("^What do you wish to harvest", [[Botany.harvestClear()]]))
 
-  -- Gather Success
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You gather some .+\\.$", [[Botany.gathered()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You fill the vial with saltwater\\.$", [[Botany.gathered()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You pick .+\\.$", [[Botany.gathered()]]))
 
-  -- Gather Failures (Expanded to prevent stalls)
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^There is nothing here to gather\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^You can find no more .+ here\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^There is no .+ here to gather\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^You cannot gather anything here\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^There is no .+ here\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^What do you wish to gather", [[Botany.gatherClear()]]))
-
-  -- Specific flavor text failures
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^You have already gathered from th(?:is|at) plant recently\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^You carefully search the cracks and crevices of the surrounding rock, but find nothing\\.$", [[Botany.gatherClear()]]))
   
-  -- Balance Recovery
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You have recovered balance on all limbs\\.$", [[
-    if Botany.Harvesting then
-      Botany.harvest()
-      Botany.harvestFinished()
-    elseif Botany.Gathering then
-      Botany.gather()
-    end
+    if Botany.Harvesting then Botany.harvest(); Botany.harvestFinished()
+    elseif Botany.Gathering then Botany.gather() end
   ]]))
 end
 
--- =========================================================================
--- PROMPT INJECTION
--- =========================================================================
 function Botany.onPrompt()
   if (Botany.HarvestOn and Botany.Harvesting) or (Botany.GatherOn and Botany.Gathering) then
     cecho("<botanyText>(<botanyMain>Botany<botanyText>)<reset> ")
@@ -805,17 +739,11 @@ end
 
 function Botany.init()
   Botany.load()
-  
-  -- Clean up old event handlers to prevent duplication on script save!
   for _, id in pairs(Botany.event_ids) do killAnonymousEventHandler(id) end
   Botany.event_ids = {}
 
-  if Botany.ButcheryOn then Botany.loadExtension("butchery") end
-  if Botany.RefiningOn then Botany.loadExtension("refining") end
-  
   Botany.createTriggers()
   
-  -- Helper function to register and track our events
   local reg = function(event, func)
     table.insert(Botany.event_ids, registerAnonymousEventHandler(event, func))
   end
@@ -826,12 +754,9 @@ function Botany.init()
   reg("gmcp.Room.Info", "Botany.onRoom")
   reg("gmcp.Char.Items.List", "Botany.checkRoomItems")
   reg("gmcp.Char.Items.Add", "Botany.checkRoomItems")
-  
-  -- Replaces the faulty tempPromptTrigger with a native Mudlet event
   reg("sysPrompt", "Botany.onPrompt")
   
   Botany.echo("System Initialized.")
 end
 
--- Run initialization immediately on script load/save
 Botany.init()
