@@ -1,0 +1,5 @@
+Botany: Automated Harvesting & Gathering System (v1.0.0)
+
+A comprehensive, zero-dependency environmental gathering ledger for Achaea.
+Botany seamlessly automates the harvesting of herbs and the gathering of commodities with a smart, environment-aware queue system. It features an intelligent area-memory tracker to prevent redundant harvesting, situational alerts for rare creatures, and dynamic modules for butchering corpses and refining raw materials. 
+To configure your tracking preferences, simply open the Botany-Core script in your Script Editor. Type "bot help" in the game to see a list of on-the-fly commands and UI toggles!
