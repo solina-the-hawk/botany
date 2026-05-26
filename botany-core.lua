@@ -183,43 +183,47 @@ end
 -- =========================================================================
 -- GATHERING LOGIC
 -- =========================================================================
-function Botany.gatherScan()
-  if Botany.GatherOn == true then
-    if Botany.Balance == 1 then
-      Botany.Gathering = true
-      local rtype = gmcp.Room.Info.environment
-      Botany.echo("Attempting to gather in: " .. rtype .. "!")
-      
-      if rtype == "River" then 
-        if Botany.Clay.Enabled then Botany.Clay.Gather = true end
-      elseif rtype == "Ocean" then 
-        if Botany.Saltwater.Enabled then Botany.Saltwater.Gather = true end
-      elseif rtype == "Garden" then 
-        if Botany.Fruit.Enabled then Botany.Fruit.Gather = true end
-        if Botany.Vegetables.Enabled then Botany.Vegetables.Gather = true end
-      elseif rtype == "Grasslands" then 
-        if Botany.Grain.Enabled then Botany.Grain.Gather = true end
-        if Botany.Sugarcane.Enabled then Botany.Sugarcane.Gather = true end
-      elseif rtype == "Farm" then 
-        if Botany.Farm.Enabled then Botany.Farm.Gather = true end
-      elseif rtype == "Forest" then 
-        if Botany.Nuts.Enabled then Botany.Nuts.Gather = true end
-      elseif rtype == "Valley" then 
-        if Botany.Olives.Enabled then Botany.Olives.Gather = true end
-      elseif rtype == "Natural underground" then 
-        if Botany.Lumic.Enabled then Botany.Lumic.Gather = true end
-        if Botany.Dust.Enabled then Botany.Dust.Gather = true end
-      elseif rtype == "Jungle" then 
-        if Botany.Fruit.Enabled then Botany.Fruit.Gather = true end
-        if Botany.Cacao.Enabled then Botany.Cacao.Gather = true end
-      end
-      Botany.gather()
-    else
-      Botany.echo("Off Balance!")
-    end
-  else
-    Botany.echo("Gathering is off.")
+function Botany.gatherScan(isManual)
+  if not Botany.GatherOn then return false end
+  if Botany.Balance ~= 1 then
+    if isManual then Botany.echo("Off Balance!") end
+    return false
   end
+
+  local rtype = gmcp.Room.Info.environment
+  local found = false
+
+  if rtype == "River" then 
+    if Botany.Clay.Enabled then Botany.Clay.Gather = true; found = true end
+  elseif rtype == "Ocean" then 
+    if Botany.Saltwater.Enabled then Botany.Saltwater.Gather = true; found = true end
+  elseif rtype == "Garden" then 
+    if Botany.Fruit.Enabled then Botany.Fruit.Gather = true; found = true end
+    if Botany.Vegetables.Enabled then Botany.Vegetables.Gather = true; found = true end
+  elseif rtype == "Grasslands" then 
+    if Botany.Grain.Enabled then Botany.Grain.Gather = true; found = true end
+    if Botany.Sugarcane.Enabled then Botany.Sugarcane.Gather = true; found = true end
+  elseif rtype == "Farm" then 
+    if Botany.Farm.Enabled then Botany.Farm.Gather = true; found = true end
+  elseif rtype == "Forest" then 
+    if Botany.Nuts.Enabled then Botany.Nuts.Gather = true; found = true end
+  elseif rtype == "Valley" then 
+    if Botany.Olives.Enabled then Botany.Olives.Gather = true; found = true end
+  elseif rtype == "Natural underground" then 
+    if Botany.Lumic.Enabled then Botany.Lumic.Gather = true; found = true end
+    if Botany.Dust.Enabled then Botany.Dust.Gather = true; found = true end
+  elseif rtype == "Jungle" then 
+    if Botany.Fruit.Enabled then Botany.Fruit.Gather = true; found = true end
+    if Botany.Cacao.Enabled then Botany.Cacao.Gather = true; found = true end
+  end
+
+  if found then
+    Botany.Gathering = true
+    if isManual then Botany.echo("Attempting to gather in: " .. rtype .. "!") end
+    Botany.gather()
+    return true
+  end
+  return false
 end
 
 function Botany.gather()
@@ -245,7 +249,6 @@ end
 function Botany.gatherClear()
   local item = Botany.GathTar
   if item and Botany[item] then
-    Botany.echo("Unable to gather " .. item)
     Botany[item].Gather = false
     Botany.gather()
   end
@@ -283,7 +286,6 @@ end
 function Botany.harvestClear()
   local plant = Botany.HarvTar
   if Botany[plant] then
-    Botany.echo("Unable to harvest " .. plant)
     Botany[plant].Harvest = false
     Botany.harvest()
   else
@@ -308,8 +310,11 @@ function Botany.harvestFinished()
     Botany.Harvesting = false
     Botany.echo("Finished Harvesting!")
     send("inr all")
+    
+    -- Chain into gathering, if nothing gathered, safely mark the room
     if Botany.GatherOn then
-      Botany.gatherScan()
+      local startedGathering = Botany.gatherScan(false)
+      if not startedGathering then Botany.markRoom() end
     else
       Botany.markRoom()
     end
@@ -345,54 +350,58 @@ function Botany.harvest()
   end
 end
 
-function Botany.harvestScan()
-  if Botany.HarvestOn == true then
-    if Botany.Balance == 1 then
-      Botany.Harvesting = true
-      local rtype = gmcp.Room.Info.environment
-      Botany.echo("Attempting to harvest: " .. rtype .. " Herbs!")
-      
-      if rtype == "Garden" or rtype == "Forest" then
-        if Botany.Ginseng.Enabled then Botany.Ginseng.Harvest = true end
-        if Botany.Echinacea.Enabled then Botany.Echinacea.Harvest = true end
-        if Botany.Myrrh.Enabled then Botany.Myrrh.Harvest = true end
-        if Botany.Ginger.Enabled then Botany.Ginger.Harvest = true end
-        if Botany.Lobelia.Enabled then Botany.Lobelia.Harvest = true end
-        if Botany.Elm.Enabled then Botany.Elm.Harvest = true end
-      elseif rtype == "Hills" then 
-        if Botany.Hawthorn.Enabled then Botany.Hawthorn.Harvest = true end
-        if Botany.Bayberry.Enabled then Botany.Bayberry.Harvest = true end
-      elseif rtype == "Swamp" then 
-        if Botany.Ash.Enabled then Botany.Ash.Harvest = true end
-        if Botany.Bellwort.Enabled then Botany.Bellwort.Harvest = true end
-        if Botany.Cohosh.Enabled then Botany.Cohosh.Harvest = true end
-      elseif rtype == "Freshwater" or rtype == "Ocean" then 
-        if Botany.Kelp.Enabled then Botany.Kelp.Harvest = true end
-      elseif rtype == "Grasslands" then 
-        if Botany.Goldenseal.Enabled then Botany.Goldenseal.Harvest = true end
-        if Botany.Slipper.Enabled then Botany.Slipper.Harvest = true end
-      elseif rtype == "Mountains" then 
-        if Botany.Valerian.Enabled then Botany.Valerian.Harvest = true end
-      elseif rtype == "Valley" then 
-        if Botany.Sileris.Enabled then Botany.Sileris.Harvest = true end
-      elseif rtype == "Natural underground" then 
-        if Botany.Bloodroot.Enabled then Botany.Bloodroot.Harvest = true end
-        if Botany.Irid.Enabled then Botany.Irid.Harvest = true end
-      elseif rtype == "Desert" then 
-        if Botany.Weed.Enabled then Botany.Weed.Harvest = true end
-        if Botany.Pear.Enabled then Botany.Pear.Harvest = true end
-      elseif rtype == "Jungle" then 
-        if Botany.Skullcap.Enabled then Botany.Skullcap.Harvest = true end
-        if Botany.Kuzu.Enabled then Botany.Kuzu.Harvest = true end
-        if Botany.Kola.Enabled then Botany.Kola.Harvest = true end
-      end
-      Botany.harvest()
-    else
-      Botany.echo("Off Balance!")
-    end
-  else
-    Botany.echo("Harvesting is off.")
+function Botany.harvestScan(isManual)
+  if not Botany.HarvestOn then return false end
+  if Botany.Balance ~= 1 then
+    if isManual then Botany.echo("Off Balance!") end
+    return false
   end
+
+  local rtype = gmcp.Room.Info.environment
+  local found = false
+
+  if rtype == "Garden" or rtype == "Forest" then
+    if Botany.Ginseng.Enabled then Botany.Ginseng.Harvest = true; found = true end
+    if Botany.Echinacea.Enabled then Botany.Echinacea.Harvest = true; found = true end
+    if Botany.Myrrh.Enabled then Botany.Myrrh.Harvest = true; found = true end
+    if Botany.Ginger.Enabled then Botany.Ginger.Harvest = true; found = true end
+    if Botany.Lobelia.Enabled then Botany.Lobelia.Harvest = true; found = true end
+    if Botany.Elm.Enabled then Botany.Elm.Harvest = true; found = true end
+  elseif rtype == "Hills" then 
+    if Botany.Hawthorn.Enabled then Botany.Hawthorn.Harvest = true; found = true end
+    if Botany.Bayberry.Enabled then Botany.Bayberry.Harvest = true; found = true end
+  elseif rtype == "Swamp" then 
+    if Botany.Ash.Enabled then Botany.Ash.Harvest = true; found = true end
+    if Botany.Bellwort.Enabled then Botany.Bellwort.Harvest = true; found = true end
+    if Botany.Cohosh.Enabled then Botany.Cohosh.Harvest = true; found = true end
+  elseif rtype == "Freshwater" or rtype == "Ocean" then 
+    if Botany.Kelp.Enabled then Botany.Kelp.Harvest = true; found = true end
+  elseif rtype == "Grasslands" then 
+    if Botany.Goldenseal.Enabled then Botany.Goldenseal.Harvest = true; found = true end
+    if Botany.Slipper.Enabled then Botany.Slipper.Harvest = true; found = true end
+  elseif rtype == "Mountains" then 
+    if Botany.Valerian.Enabled then Botany.Valerian.Harvest = true; found = true end
+  elseif rtype == "Valley" then 
+    if Botany.Sileris.Enabled then Botany.Sileris.Harvest = true; found = true end
+  elseif rtype == "Natural underground" then 
+    if Botany.Bloodroot.Enabled then Botany.Bloodroot.Harvest = true; found = true end
+    if Botany.Irid.Enabled then Botany.Irid.Harvest = true; found = true end
+  elseif rtype == "Desert" then 
+    if Botany.Weed.Enabled then Botany.Weed.Harvest = true; found = true end
+    if Botany.Pear.Enabled then Botany.Pear.Harvest = true; found = true end
+  elseif rtype == "Jungle" then 
+    if Botany.Skullcap.Enabled then Botany.Skullcap.Harvest = true; found = true end
+    if Botany.Kuzu.Enabled then Botany.Kuzu.Harvest = true; found = true end
+    if Botany.Kola.Enabled then Botany.Kola.Harvest = true; found = true end
+  end
+
+  if found then
+    Botany.Harvesting = true
+    if isManual then Botany.echo("Attempting to harvest: " .. rtype .. " Herbs!") end
+    Botany.harvest()
+    return true
+  end
+  return false
 end
 
 function Botany.harvestToggle()
@@ -547,7 +556,7 @@ function Botany.onRoom()
       Botany.LastRoom = roomID
       if not roomHarvested then
         tempTimer(0.5, function()
-          Botany.scan()
+          Botany.scan(false)
         end)
       end
     end
@@ -574,7 +583,7 @@ end
 
 function Botany.save()
   local baseDir = getMudletHomeDir() .. "/Botany"
-  if not lfs.attributes(baseDir) then lfs.mkdir(baseDir) end
+  if not lfs.attributes(baseDir, "mode") then lfs.mkdir(baseDir) end
   
   local exportData = {
     HarvestOn = Botany.HarvestOn,
@@ -647,13 +656,24 @@ end
 -- =========================================================================
 -- MASTER SCAN
 -- =========================================================================
-function Botany.scan()
+function Botany.scan(isManual)
+  local rtype = gmcp.Room.Info and gmcp.Room.Info.environment or "Unknown"
+  local started = false
+  
   if Botany.HarvestOn then
-    Botany.harvestScan()
-  elseif Botany.GatherOn then
-    Botany.gatherScan()
-  else
-    Botany.echo("<botanyAlert>Notice: <botanyText>Both Harvesting and Gathering are disabled. Turn one on to scan.")
+     started = Botany.harvestScan(isManual)
+  end
+
+  if not started and Botany.GatherOn then
+     started = Botany.gatherScan(isManual)
+  end
+
+  if not started and isManual then
+    if Botany.HarvestOn or Botany.GatherOn then
+        Botany.echo("<botanyAlert>Notice: <botanyText>Nothing enabled to collect in this environment (<botanyMain>" .. rtype .. "<botanyText>).")
+    else
+        Botany.echo("<botanyAlert>Notice: <botanyText>Both Harvesting and Gathering are disabled. Turn one on to scan.")
+    end
   end
 end
 
@@ -672,7 +692,7 @@ function Botany.handleCommand(args_str)
   elseif cmd == "refining" then Botany.toggleModule("refining")
   elseif cmd == "auto" then Botany.toggleAuto()
   elseif cmd == "expiration" then Botany.setExpiration(args[2])
-  elseif cmd == "scan" then Botany.scan()
+  elseif cmd == "scan" then Botany.scan(true)
   elseif cmd == "show" then Botany.showTable()
   elseif cmd == "toggle" then Botany.togglePlant(args[2])
   elseif cmd == "reset" then Botany.reset()
@@ -729,12 +749,12 @@ function Botany.createTriggers()
     if Botany.Harvesting then Botany.harvest(); Botany.harvestFinished()
     elseif Botany.Gathering then Botany.gather() end
   ]]))
-end
-
-function Botany.onPrompt()
-  if (Botany.HarvestOn and Botany.Harvesting) or (Botany.GatherOn and Botany.Gathering) then
-    cecho("<botanyText>(<botanyMain>Botany<botanyText>)<reset> ")
-  end
+  
+  table.insert(Botany.trigger_ids, tempPromptTrigger([[
+    if (Botany.HarvestOn and Botany.Harvesting) or (Botany.GatherOn and Botany.Gathering) then
+      cecho("<botanyText>(<botanyMain>Botany<botanyText>)<reset> ")
+    end
+  ]]))
 end
 
 function Botany.init()
@@ -754,7 +774,6 @@ function Botany.init()
   reg("gmcp.Room.Info", "Botany.onRoom")
   reg("gmcp.Char.Items.List", "Botany.checkRoomItems")
   reg("gmcp.Char.Items.Add", "Botany.checkRoomItems")
-  reg("sysPrompt", "Botany.onPrompt")
   
   Botany.echo("System Initialized.")
 end
