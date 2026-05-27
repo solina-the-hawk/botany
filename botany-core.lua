@@ -254,11 +254,10 @@ function Botany.gatherClear()
   end
 end
 
-function Botany.gathered()
+function Botany.gathered(amount)
   local item = Botany.GathTar
-  if item and Botany[item] then
-    Botany[item].Gather = false
-  end
+  if item and Botany[item] then Botany[item].Gather = false end
+  Botany.trackStat(item, amount or 1)
 end
 
 function Botany.gatherFinished()
@@ -278,9 +277,10 @@ end
 -- =========================================================================
 -- HARVESTING LOGIC
 -- =========================================================================
-function Botany.harvested()
+function Botany.harvested(amount)
   local plant = Botany.HarvTar
   if Botany[plant] then Botany[plant].Harvest = false end
+  Botany.trackStat(plant, amount or 1)
 end
 
 function Botany.harvestClear()
@@ -592,7 +592,10 @@ function Botany.save()
     RefiningOn = Botany.RefiningOn,
     AutoMode = Botany.AutoMode,
     GlobalExpiration = Botany.GlobalExpiration,
-    Memory = Botany.Memory
+    Memory = Botany.Memory,
+    CleaverID = Botany.CleaverID,
+    CleaverContainer = Botany.CleaverContainer,
+    LifetimeStats = Botany.Stats.Lifetime       -- ADD THIS LINE
   }
   
   local allItems = {
@@ -631,6 +634,9 @@ function Botany.load()
     if data.AutoMode ~= nil then Botany.AutoMode = data.AutoMode end
     if data.GlobalExpiration ~= nil then Botany.GlobalExpiration = data.GlobalExpiration end
     if data.Memory ~= nil then Botany.Memory = data.Memory end
+    if data.LifetimeStats ~= nil then Botany.Stats.Lifetime = data.LifetimeStats end -- ADD THIS LINE
+    if data.CleaverID ~= nil then Botany.CleaverID = data.CleaverID end             -- Added
+    if data.CleaverContainer ~= nil then Botany.CleaverContainer = data.CleaverContainer end -- Added
     
     local allItems = {
         "Ginseng", "Ash", "Echinacea", "Ginger", "Myrrh", "Bellwort", "Bloodroot", 
@@ -678,6 +684,48 @@ function Botany.scan(isManual)
 end
 
 -- =========================================================================
+-- STAT TRACKER
+-- =========================================================================
+Botany.Stats = Botany.Stats or { Session = {}, Lifetime = {} }
+
+function Botany.trackStat(item, amount)
+  if not item or item == "None" then return end
+  
+  -- Clean up the item name (capitalize first letter, lowercase rest)
+  item = item:sub(1,1):upper() .. item:sub(2):lower()
+  amount = tonumber(amount) or 1
+  
+  Botany.Stats.Session[item] = (Botany.Stats.Session[item] or 0) + amount
+  Botany.Stats.Lifetime[item] = (Botany.Stats.Lifetime[item] or 0) + amount
+end
+
+function Botany.showStats(scope)
+  scope = scope and scope:lower() == "lifetime" and "Lifetime" or "Session"
+  
+  cecho("\n<botanyAccent>==================================================\n")
+  cecho("<botanyAccent>             BOTANY STATS: <botanyMain>" .. scope:upper() .. "\n")
+  cecho("<botanyAccent>==================================================\n")
+  
+  local data = Botany.Stats[scope]
+  local hasData = false
+  local sortedKeys = {}
+  
+  for k, _ in pairs(data) do table.insert(sortedKeys, k) end
+  table.sort(sortedKeys)
+  
+  for _, k in ipairs(sortedKeys) do
+      hasData = true
+      local padding = string.rep(" ", 20 - string.len(k))
+      cecho("<botanyText>  " .. k .. padding .. ": <botanyMain>" .. data[k] .. "\n")
+  end
+  
+  if not hasData then
+      cecho("<botanyText>  No stats recorded for this " .. scope:lower() .. " yet.\n")
+  end
+  cecho("<botanyAccent>==================================================\n")
+end
+
+-- =========================================================================
 -- MASTER COMMAND HANDLER
 -- =========================================================================
 function Botany.handleCommand(args_str)
@@ -696,7 +744,21 @@ function Botany.handleCommand(args_str)
   elseif cmd == "show" then Botany.showTable()
   elseif cmd == "toggle" then Botany.togglePlant(args[2])
   elseif cmd == "reset" then Botany.reset()
-  
+  elseif cmd == "show" then Botany.showTable()
+  elseif cmd == "stats" then Botany.showStats(args[2]) -- ADD THIS LINE
+  elseif cmd == "toggle" then Botany.togglePlant(args[2])
+  elseif cmd == "cleaver" then 
+    Botany.CleaverID = args[2]
+    Botany.echo("Cleaver set to ID: <botanyMain>" .. tostring(args[2]))
+    Botany.save()
+  elseif cmd == "container" then 
+    Botany.CleaverContainer = args[2] == "none" and nil or args[2]
+    Botany.echo("Cleaver Container set to: <botanyMain>" .. tostring(args[2]))
+    Botany.save()
+  elseif cmd == "stop" then
+    if Botany.IsButchering and Botany.stopButcher then Botany.stopButcher(false) end
+    if Botany.IsRefining and Botany.stopRefine then Botany.stopRefine(false) end
+    Botany.echo("All active automated tasks have been halted.")
   elseif cmd == "butcher" then
     if Botany.ButcheryOn and Botany.startButcher then Botany.startButcher(args[2])
     else Botany.echo("<botanyAlert>Error: <botanyText>Butchering module is disabled or missing. Type 'bot butchering' to enable.") end
@@ -725,17 +787,17 @@ function Botany.createTriggers()
       local args_str = matches[2] or ""
       Botany.handleCommand(args_str)
   ]]))
-
   table.insert(Botany.trigger_ids, tempRegexTrigger("^Password correct\\. Welcome to Achaea\\.$", [[Botany.init()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You reach out and carefully harvest", [[Botany.harvested()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You have already harvested from this plant recently\\.$", [[Botany.harvestClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("^That plant has been fully harvested\\.$", [[Botany.harvestClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("^What do you wish to harvest", [[Botany.harvestClear()]]))
-
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You gather some .+\\.$", [[Botany.gathered()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You fill the vial with saltwater\\.$", [[Botany.gathered()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You pick .+\\.$", [[Botany.gathered()]]))
-
+  table.insert(Botany.ButcherTriggers, tempRegexTrigger("^You skilfully butcher the corpse.*yielding (\\d+) (.+)\\.$", [[
+        Botany.trackStat(matches[3], matches[2])
+    ]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^There is nothing here to gather\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^You can find no more .+ here\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^There is no .+ here to gather\\.$", [[Botany.gatherClear()]]))
@@ -744,12 +806,10 @@ function Botany.createTriggers()
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^What do you wish to gather", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^You have already gathered from th(?:is|at) plant recently\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^You carefully search the cracks and crevices of the surrounding rock, but find nothing\\.$", [[Botany.gatherClear()]]))
-  
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You have recovered balance on all limbs\\.$", [[
     if Botany.Harvesting then Botany.harvest(); Botany.harvestFinished()
     elseif Botany.Gathering then Botany.gather() end
   ]]))
-  
   table.insert(Botany.trigger_ids, tempPromptTrigger([[
     if (Botany.HarvestOn and Botany.Harvesting) or (Botany.GatherOn and Botany.Gathering) then
       cecho("<botanyText>(<botanyMain>Botany<botanyText>)<reset> ")
