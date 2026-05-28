@@ -119,8 +119,8 @@ function Botany.initButcheryTriggers()
         if Botany.IsButchering then Botany.doNextButcher() end
     ]]))
     
-    -- Bypass stalled failures
-    table.insert(Botany.ButcherTriggers, tempRegexTrigger("^(You cannot butcher that|That corpse is too degraded|What do you wish to butcher).*$", [[
+    -- Bypass stalled failures, mutilations, and empty inventories
+    table.insert(Botany.ButcherTriggers, tempRegexTrigger("^(You cannot butcher that|That corpse is too degraded|What do you wish to butcher|As you set about butchering the corpse|You have no corpse suitable).*$", [[
         if Botany.IsButchering then Botany.doNextButcher() end
     ]]))
 end

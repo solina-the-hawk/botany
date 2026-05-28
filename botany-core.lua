@@ -728,9 +728,23 @@ end
 -- =========================================================================
 -- MASTER COMMAND HANDLER
 -- =========================================================================
+Botany.IsInitialized = Botany.IsInitialized or false
+
 function Botany.handleCommand(args_str)
   local args = args_str:split(" ")
   local cmd = args[1] and args[1]:lower() or ""
+
+  -- Allow the init command even if dormant
+  if cmd == "init" or cmd == "start" then
+    Botany.init()
+    return
+  end
+
+  -- Block all other commands if not initialized
+  if not Botany.IsInitialized then
+    Botany.echo("<botanyAlert>Botany is currently dormant. Type <botanyMain>bot init<botanyText> to wake it up.")
+    return
+  end
 
   if cmd == "" then Botany.display()
   elseif cmd == "help" then Botany.help()
@@ -744,9 +758,7 @@ function Botany.handleCommand(args_str)
   elseif cmd == "show" then Botany.showTable()
   elseif cmd == "toggle" then Botany.togglePlant(args[2])
   elseif cmd == "reset" then Botany.reset()
-  elseif cmd == "show" then Botany.showTable()
-  elseif cmd == "stats" then Botany.showStats(args[2]) -- ADD THIS LINE
-  elseif cmd == "toggle" then Botany.togglePlant(args[2])
+  elseif cmd == "stats" then Botany.showStats(args[2]) 
   elseif cmd == "cleaver" then 
     Botany.CleaverID = args[2]
     Botany.echo("Cleaver set to ID: <botanyMain>" .. tostring(args[2]))
@@ -774,20 +786,21 @@ end
 -- INITIALIZATION & TRIGGERS
 -- =========================================================================
 Botany.trigger_ids = Botany.trigger_ids or {}
-Botany.alias_ids = Botany.alias_ids or {}
 Botany.event_ids = Botany.event_ids or {}
+
+-- 1. Create the permanent command alias outside of the init sequence
+if Botany.MainAlias then killAlias(Botany.MainAlias) end
+Botany.MainAlias = tempAlias("^(?i)(?:bot|botany)(?:\\s+(.*))?$", [[
+    local args_str = matches[2] or ""
+    Botany.handleCommand(args_str)
+]])
 
 function Botany.createTriggers()
   for _, id in pairs(Botany.trigger_ids) do killTrigger(id) end
-  for _, id in pairs(Botany.alias_ids) do killAlias(id) end
   Botany.trigger_ids = {}
-  Botany.alias_ids = {}
 
-  table.insert(Botany.alias_ids, tempAlias("^(?i)(?:bot|botany)(?:\\s+(.*))?$", [[
-      local args_str = matches[2] or ""
-      Botany.handleCommand(args_str)
-  ]]))
-  table.insert(Botany.trigger_ids, tempRegexTrigger("^Password correct\\. Welcome to Achaea\\.$", [[Botany.init()]]))
+  -- The automatic login trigger has been removed to prevent client crashes.
+  
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You reach out and carefully harvest (\\d+)", [[
       Botany.harvested(matches[2])
       Botany.gathered(matches[2])
@@ -798,9 +811,11 @@ function Botany.createTriggers()
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You gather some .+\\.$", [[Botany.gathered()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You fill the vial with saltwater\\.$", [[Botany.gathered()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You pick .+\\.$", [[Botany.gathered()]]))
-  table.insert(Botany.ButcherTriggers, tempRegexTrigger("^You skilfully butcher the corpse.*yielding (\\d+) (.+)\\.$", [[
-        Botany.trackStat(matches[3], matches[2])
-    ]]))
+  
+  table.insert(Botany.trigger_ids, tempRegexTrigger("preparing (\\d+) ([\\w\\s]+)\\.$", [[
+      Botany.trackStat(matches[3], matches[2])
+  ]]))
+  
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^There is nothing here to gather\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^You can find no more .+ here\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^There is no .+ here to gather\\.$", [[Botany.gatherClear()]]))
@@ -813,6 +828,7 @@ function Botany.createTriggers()
     if Botany.Harvesting then Botany.harvest(); Botany.harvestFinished()
     elseif Botany.Gathering then Botany.gather() end
   ]]))
+  
   table.insert(Botany.trigger_ids, tempPromptTrigger([[
     if (Botany.HarvestOn and Botany.Harvesting) or (Botany.GatherOn and Botany.Gathering) then
       cecho("<botanyText>(<botanyMain>Botany<botanyText>)<reset> ")
@@ -821,7 +837,13 @@ function Botany.createTriggers()
 end
 
 function Botany.init()
+  if Botany.IsInitialized then
+      Botany.echo("System is already initialized.")
+      return
+  end
+
   Botany.load()
+  
   for _, id in pairs(Botany.event_ids) do killAnonymousEventHandler(id) end
   Botany.event_ids = {}
 
@@ -838,7 +860,8 @@ function Botany.init()
   reg("gmcp.Char.Items.List", "Botany.checkRoomItems")
   reg("gmcp.Char.Items.Add", "Botany.checkRoomItems")
   
-  Botany.echo("System Initialized.")
+  Botany.IsInitialized = true
+  Botany.echo("System Initialized & Ready.")
 end
 
-Botany.init()
+-- NOTE: Botany.init() is no longer called automatically here to prevent Mudlet crashes on login.
