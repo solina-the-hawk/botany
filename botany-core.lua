@@ -815,13 +815,15 @@ function Botany.createTriggers()
   table.insert(Botany.trigger_ids, tempRegexTrigger("preparing (\\d+) ([\\w\\s]+)\\.$", [[
       Botany.trackStat(matches[3], matches[2])
   ]]))
-  
+  table.insert(Botany.trigger_ids, tempRegexTrigger("^Sifting through the soft riverbed with your fingers, you collect (\\d+)", [[Botany.gathered(matches[2])]]))
+  table.insert(Botany.trigger_ids, tempRegexTrigger("^As you cleanse the clay in the riverwater, you discover a pile of gold flakes", [[Botany.trackStat("Gold flakes", 1)]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^There is nothing here to gather\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^You can find no more .+ here\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^There is no .+ here to gather\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^You cannot gather anything here\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^There is no .+ here\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^What do you wish to gather", [[Botany.gatherClear()]]))
+  table.insert(Botany.trigger_ids, tempRegexTrigger("^You carefully dig through the soft soil of the riverbed but are unable to find any suitable clay\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^You have already gathered from th(?:is|at) plant recently\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("(?i)^You carefully search the cracks and crevices of the surrounding rock, but find nothing\\.$", [[Botany.gatherClear()]]))
   table.insert(Botany.trigger_ids, tempRegexTrigger("^You have recovered balance on all limbs\\.$", [[
